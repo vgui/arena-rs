@@ -43,7 +43,6 @@ pub struct Arena<T>
 {
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<ArenaIndex>,
-	//next : ArenaIndex,
 	current_age : usize,
 	next_index : usize,
 }
@@ -56,7 +55,6 @@ impl<T> Arena<T>
 		{
 			heap : Vec::new(),
 			freed : Vec::new(),
-			//next : ArenaIndex::new(),
 			current_age : ARENA_NO_INDEX,
 			next_index : ARENA_CHUNCK_SIZE,			
 		}
@@ -171,7 +169,9 @@ mod tests
         assert_eq!(arena.heap.len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
-        assert_eq!(arena.next_index, 0);  
+        assert_eq!(arena.next_index, 0);
+        assert_eq!(index.age, 0);
+        assert_eq!(index.index, 0);
     }    
 
    #[test]
@@ -185,34 +185,54 @@ mod tests
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
         assert_eq!(arena.next_index, 1);  
+        assert_eq!(index.age, 0);
+        assert_eq!(index.index, 0);
     }     
 
     #[test]
     fn arena_alloc5() 
     {
         let mut arena = Arena::<MyStruct>::new();
-        let index = arena.alloc(MyStruct);
-        let index = arena.alloc(MyStruct);
-        let index = arena.alloc(MyStruct);
-        let index = arena.alloc(MyStruct);
-        let index = arena.alloc(MyStruct);
+        let index0 = arena.alloc(MyStruct);
+        let index1 = arena.alloc(MyStruct);
+        let index2 = arena.alloc(MyStruct);
+        let index3 = arena.alloc(MyStruct);
+        let index4 = arena.alloc(MyStruct);
 
         assert_eq!(arena.heap.len(), 1);
         assert_eq!(arena.heap[0].len(), 5);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
         assert_eq!(arena.next_index, 5);  
-    }         
+        assert_eq!(index0.age, 0);
+        assert_eq!(index0.index, 0);
+        assert_eq!(index1.age, 0);
+        assert_eq!(index1.index, 1);
+        assert_eq!(index2.age, 0);
+        assert_eq!(index2.index, 2);
+        assert_eq!(index3.age, 0);
+        assert_eq!(index3.index, 3);
+        assert_eq!(index4.age, 0);
+        assert_eq!(index4.index, 4);
+	}         
+
+	fn arena_alloc_n(n : usize) -> (Arena<MyStruct>, Vec<ArenaIndex>)
+	{
+        let mut arena = Arena::<MyStruct>::new();
+        let mut indexs = Vec::new();
+
+        for i in 0..ARENA_CHUNCK_SIZE + 1//[start..end-1]
+        {
+        	indexs.push(arena.alloc(MyStruct));
+        }
+
+        (arena, indexs)
+	}
 
     #[test]
     fn arena_alloc_chunck_size() 
     {
-        let mut arena = Arena::<MyStruct>::new();
-
-        for i in 0..ARENA_CHUNCK_SIZE+1//[start..end-1]
-        {
-        	arena.alloc(MyStruct);
-        }
+        let (arena, indexs) = arena_alloc_n(ARENA_CHUNCK_SIZE + 1);
 
         assert_eq!(arena.heap.len(), 2);
         assert_eq!(arena.heap[0].len(), ARENA_CHUNCK_SIZE);
@@ -220,17 +240,17 @@ mod tests
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
         assert_eq!(arena.next_index, 1);  
+        assert_eq!(indexs.len(), ARENA_CHUNCK_SIZE + 1);  
+        assert_eq!(indexs[ARENA_CHUNCK_SIZE - 1].age , 0);
+        assert_eq!(indexs[ARENA_CHUNCK_SIZE - 1].index , ARENA_CHUNCK_SIZE - 1);
+        assert_eq!(indexs[ARENA_CHUNCK_SIZE].age , 1);
+        assert_eq!(indexs[ARENA_CHUNCK_SIZE].index , 0);
     }             
 
     #[test]
     fn arena_alloc_check_index() 
     {
-        let mut arena = Arena::<MyStruct>::new();
-
-        for i in 0..ARENA_CHUNCK_SIZE+1//[start..end-1]
-        {
-        	arena.alloc(MyStruct);
-        }
+		let (arena, mut indexs) = arena_alloc_n(ARENA_CHUNCK_SIZE + 1);
 
         assert_eq!(arena.heap.len(), 2);
         assert_eq!(arena.heap[0].len(), ARENA_CHUNCK_SIZE);
@@ -254,6 +274,38 @@ mod tests
         assert_eq!(arena.check_index(first1), true);
         assert_eq!(arena.check_index(last1), true);
         assert_eq!(arena.check_index(after_last1), false);        
-    }             
 
+        let mut age = 0;
+        let mut index = 0;
+        for i in 0..ARENA_CHUNCK_SIZE+1//[start..end-1]
+        {
+        	indexs[i].age = age;
+        	indexs[i].index = index;
+
+        	index += 1;
+			if index == ARENA_CHUNCK_SIZE 
+			{ 
+				age +=1;
+				index = 0;
+			}
+        }        
+    }             
+/*
+    #[test]
+    fn arena_alloc5() 
+    {
+        let mut arena = Arena::<MyStruct>::new();
+        let index = arena.alloc(MyStruct);
+        let index = arena.alloc(MyStruct);
+        let index = arena.alloc(MyStruct);
+        let index = arena.alloc(MyStruct);
+        let index = arena.alloc(MyStruct);
+
+        assert_eq!(arena.heap.len(), 1);
+        assert_eq!(arena.heap[0].len(), 5);
+        assert_eq!(arena.freed.len(), 0);
+        assert_eq!(arena.current_age, 0);
+        assert_eq!(arena.next_index, 5);  
+    }         
+*/
 }
