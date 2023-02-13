@@ -1,6 +1,2 @@
 mod arena;
-
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
+use crate::arena::{ArenaIndex, Arena};
