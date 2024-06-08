@@ -1,2 +1,2 @@
 mod arena;
-use crate::arena::{ArenaIndex, Arena};
+use crate::arena::{Index, Arena};
