@@ -63,25 +63,27 @@ pub struct Arena<T>
 impl<T> Arena<T> 
 {	
 	pub fn new() -> Self 
-	{				
+	{		
+		let arenas : usize;		
 		{
-			let mut arenas = ARENAS.lock().unwrap();
-			*arenas += 1;		
-
-			let mut heap = Vec::new();
-			heap.push(Vec::new());
-
-			let arena = Self 
-			{
-				id : *arenas,
-				heap : heap,
-				freed : Vec::new(),
-				current_age : 0,
-				next_index : 0,			
-			};	
-
-			arena
+			let mut lock = ARENAS.lock().unwrap();
+			*lock += 1;
+			arenas = *lock;
 		}
+
+		let mut heap = Vec::new();
+		heap.push(Vec::new());
+
+		let arena = Self 
+		{
+			id : arenas,
+			heap : heap,
+			freed : Vec::new(),
+			current_age : 0,
+			next_index : 0,			
+		};	
+
+		arena		
 	}
 
 	pub fn id(&self) -> usize
