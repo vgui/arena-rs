@@ -3,9 +3,10 @@
 #![allow(unused_imports)]
 
 use std::vec::Vec;
+use std::sync::Mutex;
 
+static ARENAS : Mutex<usize> = Mutex::new(0);
 
-static mut ARENAS : usize = 0;
 const ARENA_CHUNK_SIZE : usize = 64;
 
 
@@ -63,21 +64,24 @@ impl<T> Arena<T>
 {	
 	pub fn new() -> Self 
 	{				
-		unsafe{ARENAS += 1;}
-
-		let mut heap = Vec::new();
-		heap.push(Vec::new());
-
-		let arena = Self 
 		{
-			id : 0,
-			heap : heap,
-			freed : Vec::new(),
-			current_age : 0,
-			next_index : 0,			
-		};
+			let mut arenas = ARENAS.lock().unwrap();
+			*arenas += 1;		
 
-		arena
+			let mut heap = Vec::new();
+			heap.push(Vec::new());
+
+			let arena = Self 
+			{
+				id : *arenas,
+				heap : heap,
+				freed : Vec::new(),
+				current_age : 0,
+				next_index : 0,			
+			};	
+
+			arena
+		}
 	}
 
 	pub fn id(&self) -> usize
@@ -306,7 +310,7 @@ mod tests
         let last1 = Index{arena : arena.id(), age : 1, index : 0};
         let after_last1 = Index{arena : arena.id(), age : 1, index : 1};
 
-        let fake_index = Index{arena : 3, age : 0, index : 0};
+        let fake_index = Index{arena : 33, age : 0, index : 0};
 
         assert_eq!(arena.check_index(first0), true);
         assert_eq!(arena.check_index(last0), true);
