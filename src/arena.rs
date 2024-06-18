@@ -13,7 +13,7 @@ const ARENA_CHUNK_SIZE : usize = 64;
 #[derive(Copy, Clone, Debug)]
 pub struct Index 
 {
-	arena : usize,
+	arena : usize,//Arena identifier from ARENAS
 	age : usize,
 	index : usize,
 }
@@ -53,11 +53,11 @@ impl PartialEq for Index
 
 pub struct Arena<T>
 {
-	id : usize,
+	id : usize,//Arena identifier from ARENAS
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<Index>,
 	current_age : usize,
-	next_index : usize,	
+	next_index : usize,
 }
 
 impl<T> Arena<T> 
@@ -120,9 +120,9 @@ impl<T> Arena<T>
 
 	fn check_index(&self, index : Index) -> bool
 	{		
-		if self.id == index.arena &&
-			index.age < self.heap.len() && 
-				index.index < self.heap[index.age].len()
+		if self.id == index.arena
+			&& index.age < self.heap.len()
+				&& index.index < self.heap[index.age].len()					
 		{
 			true
 		}
@@ -134,7 +134,7 @@ impl<T> Arena<T>
 
 	pub fn free(&mut self, index : Index) 
 	{
-		if index.is_valid() && self.check_index(index) == false
+		if index.is_valid() && self.check_index(index) == false && self[index].is_some() == false
 		{
 			panic!("Wrong Arena index for freeing !")
 		}
@@ -169,13 +169,13 @@ mod tests
     #[derive(Debug)]
     struct MyStruct
     {
-    	x : i32,
+    	x : usize,
     	y : String,
     }
 
     impl MyStruct
     {
-    	pub fn new(x : i32, y : &str) -> Self
+    	pub fn new(x : usize, y : &str) -> Self
     	{
     		MyStruct
     		{
@@ -259,6 +259,7 @@ mod tests
 	}         
 
 	//Alloc 'n' objects in a new Arena
+	//For more test accuracy need MyStruct::new(i,"All is fine")
 	fn arena_alloc_n(n : usize) -> (Arena<MyStruct>, Vec<Index>)
 	{
         let mut arena = Arena::<MyStruct>::new();
@@ -266,7 +267,8 @@ mod tests
 
         for i in 0..n
         {
-        	indexs.push(arena.alloc(MyStruct::new(16838, "All is fine")));
+        	//For more test accuracy need MyStruct::new(i,"All is fine")
+        	indexs.push(arena.alloc(MyStruct::new(i, "All is fine")));
         }
 
         (arena, indexs)
@@ -283,7 +285,7 @@ mod tests
         assert_eq!(arena.heap[1].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
-        assert_eq!(arena.next_index, 1);  
+        assert_eq!(arena.next_index, 1);
         assert_eq!(indexs.len(), ARENA_CHUNK_SIZE + 1);  
         assert_eq!(indexs[ARENA_CHUNK_SIZE - 1].age , 0);
         assert_eq!(indexs[ARENA_CHUNK_SIZE - 1].index , ARENA_CHUNK_SIZE - 1);
@@ -356,27 +358,27 @@ mod tests
 		assert_eq!(arena.freed.len(), 1);
 		assert_eq!(arena.freed[0], index1);		
 
-		assert_eq!(arena.heap[13][12], Some(MyStruct::new(16838, "All is fine")));
+		assert_eq!(arena.heap[13][12], Some(MyStruct::new(13*ARENA_CHUNK_SIZE+12, "All is fine")));
 		assert_eq!(arena[index1], None);
-		assert_eq!(arena.heap[13][14], Some(MyStruct::new(16838, "All is fine")));
+		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*ARENA_CHUNK_SIZE+14, "All is fine")));
 
 		let index2 = Index{arena : arena.id(), age : 100, index : 0};
 		arena.free(index2);
 		assert_eq!(arena.freed.len(), 2);
 		assert_eq!(arena.freed[1], index2);		
 
-		assert_eq!(arena.heap[99][ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(16838, "All is fine")));
+		assert_eq!(arena.heap[99][ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(99*ARENA_CHUNK_SIZE+63, "All is fine")));
 		assert_eq!(arena[index2], None);
 
 		//alloc after free
-		let new_index1 = arena.alloc(MyStruct::new(16838, "All is fine"));
+		let new_index1 = arena.alloc(MyStruct::new(777, "All is fine"));
 		assert_eq!(index2, new_index1);
-		assert_eq!(arena[index2], Some(MyStruct::new(16838, "All is fine")));
+		assert_eq!(arena[index2], Some(MyStruct::new(777, "All is fine")));
 		assert_eq!(arena.freed.len(), 1);
 
-		let new_index2 = arena.alloc(MyStruct::new(16838, "All is fine"));
+		let new_index2 = arena.alloc(MyStruct::new(888, "All is fine"));
 		assert_eq!(index1, new_index2);
-		assert_eq!(arena[index1], Some(MyStruct::new(16838, "All is fine")));		
+		assert_eq!(arena[index1], Some(MyStruct::new(888, "All is fine")));		
 		assert_eq!(arena.freed.len(), 0);
     }         
 }//mod tests
