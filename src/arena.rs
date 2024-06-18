@@ -7,8 +7,6 @@ use std::sync::Mutex;
 
 static ARENAS : Mutex<usize> = Mutex::new(0);
 
-const ARENA_CHUNK_SIZE : usize = 64;
-
 
 #[derive(Copy, Clone, Debug)]
 pub struct Index 
@@ -29,18 +27,6 @@ impl Index
 			index,
 		}
 	}
-
-	pub fn is_valid(&self) -> bool
-	{
-		if self.index < ARENA_CHUNK_SIZE
-		{
-			true
-		}
-		else
-		{
-			false
-		}
-	}
 }
 
 impl PartialEq for Index 
@@ -54,6 +40,7 @@ impl PartialEq for Index
 pub struct Arena<T>
 {
 	id : usize,//Arena identifier from ARENAS
+	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<Index>,
 	current_age : usize,
@@ -62,7 +49,7 @@ pub struct Arena<T>
 
 impl<T> Arena<T> 
 {	
-	pub fn new() -> Self 
+	pub fn new(chunk_size : usize) -> Self 
 	{		
 		let arenas : usize;		
 		{
@@ -77,6 +64,7 @@ impl<T> Arena<T>
 		let arena = Self 
 		{
 			id : arenas,
+			chunk_size : chunk_size,
 			heap : heap,
 			freed : Vec::new(),
 			current_age : 0,
@@ -91,16 +79,15 @@ impl<T> Arena<T>
 		self.id
 	}
 
-	pub fn alloc(&mut self, obj: T) -> Index		
+	pub fn alloc(&mut self, obj: T) -> Index
 	{		
-		//self.alloc_chunk();
 		//Chunk is full, need to alloc new chunk.
-		if self.next_index == ARENA_CHUNK_SIZE 
+		if self.next_index == self.chunk_size 
 		{
 			self.heap.push(Vec::new());		
 			self.next_index = 0;
 			self.current_age += 1;						
-			self.heap[self.current_age].reserve(ARENA_CHUNK_SIZE);
+			self.heap[self.current_age].reserve(self.chunk_size);
 		}		
 
 		if self.freed.len() == 0  
@@ -134,7 +121,7 @@ impl<T> Arena<T>
 
 	pub fn free(&mut self, index : Index) 
 	{
-		if index.is_valid() && self.check_index(index) == false && self[index].is_some() == false
+		if self.check_index(index) == false && self[index].is_some() == false
 		{
 			panic!("Wrong Arena index for freeing !")
 		}
@@ -159,12 +146,25 @@ impl<T> std::ops::Index<Index> for Arena<T>
     }
 }
 
+pub trait ArenaTrait
+{
+	fn alloc<T>(&mut self, obj: T) -> Index;
+
+	fn free(&mut self, index : Index);
+}
+
+// impl ArenaTrait for 
+// {
+// 	// add code here
+// }
 
 #[cfg(test)]
 mod tests 
 {
 	use super::*;
     use crate::arena::{Index, Arena};
+
+    const TEST_ARENA_CHUNK_SIZE : usize = 64;
 
     #[derive(Debug)]
     struct MyStruct
@@ -203,7 +203,7 @@ mod tests
     #[test]
     fn arena_new() 
     {
-        let arena = Arena::<MyStruct>::new();
+        let arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
 
         assert_eq!(arena.heap.len(), 1);
         assert_eq!(arena.freed.len(), 0);
@@ -214,7 +214,7 @@ mod tests
    #[test]
     fn arena_alloc() 
     {
-        let mut arena = Arena::<MyStruct>::new();
+        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
         let index = arena.alloc(MyStruct::new(16838, "All is fine"));
 
         assert_eq!(arena.heap.len(), 1);
@@ -229,7 +229,7 @@ mod tests
     #[test]
     fn arena_alloc5() 
     {
-        let mut arena = Arena::<MyStruct>::new();
+        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
         let index0 = arena.alloc(MyStruct::new(0, "All is fine 0"));
         let index1 = arena.alloc(MyStruct::new(1, "All is fine 1"));
         let index2 = arena.alloc(MyStruct::new(2, "All is fine 2"));
@@ -262,7 +262,7 @@ mod tests
 	//For more test accuracy need MyStruct::new(i,"All is fine")
 	fn arena_alloc_n(n : usize) -> (Arena<MyStruct>, Vec<Index>)
 	{
-        let mut arena = Arena::<MyStruct>::new();
+        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
         let mut indexs = Vec::new();
 
         for i in 0..n
@@ -278,37 +278,37 @@ mod tests
     fn arena_alloc_chunk_size() 
     {
     	//We force to alloc new chunk
-        let (arena, indexs) = arena_alloc_n(ARENA_CHUNK_SIZE + 1);
+        let (arena, indexs) = arena_alloc_n(TEST_ARENA_CHUNK_SIZE + 1);
 
         assert_eq!(arena.heap.len(), 2);//Two chunks in a heap
-        assert_eq!(arena.heap[0].len(), ARENA_CHUNK_SIZE);
+        assert_eq!(arena.heap[0].len(), TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.heap[1].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
         assert_eq!(arena.next_index, 1);
-        assert_eq!(indexs.len(), ARENA_CHUNK_SIZE + 1);  
-        assert_eq!(indexs[ARENA_CHUNK_SIZE - 1].age , 0);
-        assert_eq!(indexs[ARENA_CHUNK_SIZE - 1].index , ARENA_CHUNK_SIZE - 1);
-        assert_eq!(indexs[ARENA_CHUNK_SIZE].age , 1);
-        assert_eq!(indexs[ARENA_CHUNK_SIZE].index , 0);
+        assert_eq!(indexs.len(), TEST_ARENA_CHUNK_SIZE + 1);  
+        assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE - 1].age , 0);
+        assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE - 1].index , TEST_ARENA_CHUNK_SIZE - 1);
+        assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE].age , 1);
+        assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE].index , 0);
     }             
 
     #[test]
     fn arena_alloc_check_index() 
     {
     	//We force to alloc new chunk
-        let (arena, indexs) = arena_alloc_n(ARENA_CHUNK_SIZE + 1);
+        let (arena, indexs) = arena_alloc_n(TEST_ARENA_CHUNK_SIZE + 1);
 
         assert_eq!(arena.heap.len(), 2);//Two chunks in a heap
-        assert_eq!(arena.heap[0].len(), ARENA_CHUNK_SIZE);
+        assert_eq!(arena.heap[0].len(), TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.heap[1].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
         assert_eq!(arena.next_index, 1);  
 
         let first0 = Index{arena : arena.id(), age : 0, index : 0};
-        let last0 = Index{arena : arena.id(), age : 0, index : ARENA_CHUNK_SIZE - 1};
-        let after_last0 = Index{arena : arena.id(), age : 0, index : ARENA_CHUNK_SIZE};
+        let last0 = Index{arena : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE - 1};
+        let after_last0 = Index{arena : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE};
 
         let first1 = Index{arena : arena.id(), age : 1, index : 0};
         let last1 = Index{arena : arena.id(), age : 1, index : 0};
@@ -328,13 +328,13 @@ mod tests
 
         let mut age = 0;
         let mut index = 0;
-        for i in 0..ARENA_CHUNK_SIZE+1
+        for i in 0..TEST_ARENA_CHUNK_SIZE+1
         {
         	assert_eq!(indexs[i].age, age);
         	assert_eq!(indexs[i].index, index);
 
         	index += 1;
-			if index == ARENA_CHUNK_SIZE 
+			if index == TEST_ARENA_CHUNK_SIZE 
 			{ 
 				age +=1;
 				index = 0;
@@ -345,10 +345,10 @@ mod tests
     #[test]
     fn arena_free_and_alloc_after_free() 
     {
-		let (mut arena, indexs) = arena_alloc_n(100 * ARENA_CHUNK_SIZE + 1);
+		let (mut arena, indexs) = arena_alloc_n(100 * TEST_ARENA_CHUNK_SIZE + 1);
 
         assert_eq!(arena.heap.len(), 101);
-        assert_eq!(arena.heap[0].len(), ARENA_CHUNK_SIZE);
+        assert_eq!(arena.heap[0].len(), TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 100);
         assert_eq!(arena.next_index, 1);
@@ -358,16 +358,16 @@ mod tests
 		assert_eq!(arena.freed.len(), 1);
 		assert_eq!(arena.freed[0], index1);		
 
-		assert_eq!(arena.heap[13][12], Some(MyStruct::new(13*ARENA_CHUNK_SIZE+12, "All is fine")));
+		assert_eq!(arena.heap[13][12], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+12, "All is fine")));
 		assert_eq!(arena[index1], None);
-		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*ARENA_CHUNK_SIZE+14, "All is fine")));
+		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+14, "All is fine")));
 
 		let index2 = Index{arena : arena.id(), age : 100, index : 0};
 		arena.free(index2);
 		assert_eq!(arena.freed.len(), 2);
 		assert_eq!(arena.freed[1], index2);		
 
-		assert_eq!(arena.heap[99][ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(99*ARENA_CHUNK_SIZE+63, "All is fine")));
+		assert_eq!(arena.heap[99][TEST_ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(99*TEST_ARENA_CHUNK_SIZE+63, "All is fine")));
 		assert_eq!(arena[index2], None);
 
 		//alloc after free
