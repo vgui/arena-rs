@@ -5,24 +5,24 @@
 use std::vec::Vec;
 use std::sync::Mutex;
 
-static ARENAS : Mutex<usize> = Mutex::new(0);
+static ARENA_ID : Mutex<usize> = Mutex::new(0);
 
 
 #[derive(Copy, Clone, Debug)]
 pub struct Index 
 {
-	arena : usize,//Arena identifier from ARENAS
+	arena_id : usize,//Arena identifier from ARENA_ID
 	age : usize,
 	index : usize,
 }
 
 impl Index
 {
-	pub fn new(arena : usize, age : usize, index : usize) -> Self
+	pub fn new(arena_id : usize, age : usize, index : usize) -> Self
 	{
 		Index
 		{
-			arena,
+			arena_id,
 			age,
 			index,
 		}
@@ -33,13 +33,13 @@ impl PartialEq for Index
 {
     fn eq(&self, other: &Self) -> bool 
     {
-        self.arena == other.arena && self.age == other.age && self.index == other.index
+        self.arena_id == other.arena_id && self.age == other.age && self.index == other.index
     }
 }
 
 pub struct Arena<T>
 {
-	id : usize,//Arena identifier from ARENAS
+	id : usize,//Arena identifier from ARENA_ID
 	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<Index>,
@@ -51,19 +51,19 @@ impl<T> Arena<T>
 {	
 	pub fn new(chunk_size : usize) -> Self 
 	{		
-		let arenas : usize;		
+		let arena_id : usize =		
 		{
-			let mut lock = ARENAS.lock().unwrap();
-			*lock += 1;
-			arenas = *lock;
-		}
+			let mut id = ARENA_ID.lock().unwrap();
+			*id += 1;
+			*id
+		};
 
 		let mut heap = Vec::new();
 		heap.push(Vec::new());
 
 		let arena = Self 
 		{
-			id : arenas,
+			id : arena_id,
 			chunk_size : chunk_size,
 			heap : heap,
 			freed : Vec::new(),
@@ -107,7 +107,7 @@ impl<T> Arena<T>
 
 	fn check_index(&self, index : Index) -> bool
 	{		
-		if self.id == index.arena
+		if self.id == index.arena_id
 			&& index.age < self.heap.len()
 				&& index.index < self.heap[index.age].len()					
 		{
@@ -146,17 +146,6 @@ impl<T> std::ops::Index<Index> for Arena<T>
     }
 }
 
-pub trait ArenaTrait
-{
-	fn alloc<T>(&mut self, obj: T) -> Index;
-
-	fn free(&mut self, index : Index);
-}
-
-// impl ArenaTrait for 
-// {
-// 	// add code here
-// }
 
 #[cfg(test)]
 mod tests 
@@ -306,15 +295,15 @@ mod tests
         assert_eq!(arena.current_age, 1);
         assert_eq!(arena.next_index, 1);  
 
-        let first0 = Index{arena : arena.id(), age : 0, index : 0};
-        let last0 = Index{arena : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE - 1};
-        let after_last0 = Index{arena : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE};
+        let first0 = Index{arena_id : arena.id(), age : 0, index : 0};
+        let last0 = Index{arena_id : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE - 1};
+        let after_last0 = Index{arena_id : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE};
 
-        let first1 = Index{arena : arena.id(), age : 1, index : 0};
-        let last1 = Index{arena : arena.id(), age : 1, index : 0};
-        let after_last1 = Index{arena : arena.id(), age : 1, index : 1};
+        let first1 = Index{arena_id : arena.id(), age : 1, index : 0};
+        let last1 = Index{arena_id : arena.id(), age : 1, index : 0};
+        let after_last1 = Index{arena_id : arena.id(), age : 1, index : 1};
 
-        let fake_index = Index{arena : 33, age : 0, index : 0};
+        let fake_index = Index{arena_id : 33, age : 0, index : 0};
 
         assert_eq!(arena.check_index(first0), true);
         assert_eq!(arena.check_index(last0), true);
@@ -353,7 +342,7 @@ mod tests
         assert_eq!(arena.current_age, 100);
         assert_eq!(arena.next_index, 1);
 
-		let index1 = Index{arena : arena.id(), age : 13, index : 13};
+		let index1 = Index{arena_id : arena.id(), age : 13, index : 13};
 		arena.free(index1);
 		assert_eq!(arena.freed.len(), 1);
 		assert_eq!(arena.freed[0], index1);		
@@ -362,7 +351,7 @@ mod tests
 		assert_eq!(arena[index1], None);
 		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+14, "All is fine")));
 
-		let index2 = Index{arena : arena.id(), age : 100, index : 0};
+		let index2 = Index{arena_id : arena.id(), age : 100, index : 0};
 		arena.free(index2);
 		assert_eq!(arena.freed.len(), 2);
 		assert_eq!(arena.freed[1], index2);		
