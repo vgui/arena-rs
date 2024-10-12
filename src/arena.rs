@@ -1,6 +1,6 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_imports)]
+// #![allow(dead_code)]
+// #![allow(unused_variables)]
+// #![allow(unused_imports)]
 
 use std::vec::Vec;
 use std::sync::Mutex;
@@ -315,6 +315,7 @@ mod tests
 
         assert_eq!(arena.check_index(fake_index), false);
 
+        //Check indexes
         let mut age = 0;
         let mut index = 0;
         for i in 0..TEST_ARENA_CHUNK_SIZE+1
@@ -369,5 +370,21 @@ mod tests
 		assert_eq!(index1, new_index2);
 		assert_eq!(arena[index1], Some(MyStruct::new(888, "All is fine")));		
 		assert_eq!(arena.freed.len(), 0);
+
+		//Check indexes
+        let mut age = 0;
+        let mut index = 0;
+        for i in 0..TEST_ARENA_CHUNK_SIZE+1
+        {
+        	assert_eq!(indexs[i].age, age);
+        	assert_eq!(indexs[i].index, index);
+
+        	index += 1;
+			if index == TEST_ARENA_CHUNK_SIZE 
+			{ 
+				age +=1;
+				index = 0;
+			}
+        }  		
     }         
 }//mod tests
