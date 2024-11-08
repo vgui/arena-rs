@@ -1,16 +1,8 @@
-// #![allow(dead_code)]
-// #![allow(unused_variables)]
-// #![allow(unused_imports)]
-
 use std::vec::Vec;
-use std::sync::Mutex;
 
-
-//static ARENA_ID : Mutex<usize> = Mutex::new(0);
 
 pub struct Arena<T>
 {
-//	id : usize,
 	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<usize>,
@@ -20,29 +12,16 @@ impl<T> Arena<T>
 {	
 	pub fn new(chunk_size : usize) -> Self 
 	{		
-		// let arena_id : usize =		
-		// {
-		// 	let mut id = ARENA_ID.lock().unwrap();
-		// 	*id += 1;
-		// 	*id
-		// };
-
 		let mut heap = Vec::new();
 		heap.push(Vec::new());
 
 		Self 
 		{
-//			id : arena_id,
 			chunk_size : chunk_size,
 			heap : heap,
 			freed : Vec::new(),	
 		}
 	}
-
-	// pub fn id(&self) -> usize
-	// {
-	// 	self.id
-	// }
 
 	pub fn alloc(&mut self, obj: T) -> usize
 	{		
@@ -69,39 +48,37 @@ impl<T> Arena<T>
 		}
 	}
 
-	pub fn get_index(&self, age : usize, index : usize) -> usize
-	{
-		age * self.chunk_size + index
-	}
+	// pub fn pair_to_index(&self, age : usize, index : usize) -> usize
+	// {
+	// 	age * self.chunk_size + index
+	// }
 
-	pub fn get_index_pair(&self, index : usize) -> (usize, usize)
-	{
-		let age = index / self.chunk_size;
-		let last_index = 
-		{
-			if index > self.chunk_size
-			{
-				index % self.chunk_size
-			}
-			else
-			{
-				index
-			}
-		};
+	// pub fn index_to_pair(&self, index : usize) -> (usize, usize)
+	// {
+	// 	let age = index / self.chunk_size;
+	// 	let last_index = index % self.chunk_size;
+	// 	// {
+	// 	// 	if index > self.chunk_size
+	// 	// 	{
+	// 	// 		index % self.chunk_size
+	// 	// 	}
+	// 	// 	else
+	// 	// 	{
+	// 	// 		index
+	// 	// 	}
+	// 	// };
 
-		(age, last_index)
-	}
+	// 	(age, last_index)
+	// }
 
 	fn check_index(&self, index : usize) -> bool
 	{		
-		let pair = self.get_index_pair(index);
+		//let pair = self.index_to_pair(index);
+		let age = index / self.chunk_size;
+	 	let last_index = index % self.chunk_size;
 
-		println!("Index age = {:?}", pair.0);
-		println!("Index index = {:?}", pair.1);
-		println!(" ");
-
-		if pair.0 < self.heap.len() 
-			&& pair.1 < self.heap[pair.0].len()
+		if age < self.heap.len() 
+			&& last_index < self.heap[age].len()
 		{
 			true
 		}
@@ -266,6 +243,7 @@ mod tests
         assert_eq!(indexs[4], 4);
         assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE - 1] , TEST_ARENA_CHUNK_SIZE - 1);
         assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE] , TEST_ARENA_CHUNK_SIZE);
+        assert_eq!(arena.check_index(TEST_ARENA_CHUNK_SIZE + 1) , false);
     }             
 
     #[test]
@@ -296,19 +274,21 @@ mod tests
 
         let first0 = 0;
         let last0 = TEST_ARENA_CHUNK_SIZE - 1;
-        let after_last0 = TEST_ARENA_CHUNK_SIZE;
+        let first1 = TEST_ARENA_CHUNK_SIZE;
+        let last1 = TEST_ARENA_CHUNK_SIZE + 1;
         let fake_index = 1000;
 
         assert_eq!(arena.check_index(first0), true);
         assert_eq!(arena.check_index(last0), true);
-        assert_eq!(arena.check_index(after_last0), false);
+        assert_eq!(arena.check_index(first1), true);
+        assert_eq!(arena.check_index(last1), false);
         assert_eq!(arena.check_index(fake_index), false);
 
         //Check indexes
         let mut index = 0;
-        for i in 0..TEST_ARENA_CHUNK_SIZE+1
+        while index < TEST_ARENA_CHUNK_SIZE+1
         {
-        	assert_eq!(indexs[i], index);
+        	assert_eq!(indexs[index], index);
 
         	index += 1;
         }        
@@ -323,40 +303,52 @@ mod tests
         assert_eq!(arena.heap[0].len(), TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.freed.len(), 0);
 
-		let index1 = arena.get_index(13, 13);
+        let age = 13;
+        let index = 13;
+		let index1 = age * arena.chunk_size + index;// 845
 		arena.free(index1);
 		assert_eq!(arena.freed.len(), 1);
 		assert_eq!(arena.freed[0], index1);		
 
-		assert_eq!(arena.heap[13][12], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+12, "All is fine")));
+		assert_eq!(arena[index1 - 1], Some(MyStruct::new(index1 - 1, "All is fine")));
 		assert_eq!(arena[index1], None);
-		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+14, "All is fine")));
+		assert_eq!(arena[index1 + 1], Some(MyStruct::new(index1 + 1, "All is fine")));
 
-		//let index2 = Index{arena_id : arena.id(), age : 100, index : 0};
-		let index2 = arena.get_index(100, 0);
+        let age = 99;
+        let index = 63;
+		let index2 = age * arena.chunk_size + index;// 6399
 		arena.free(index2);
 		assert_eq!(arena.freed.len(), 2);
 		assert_eq!(arena.freed[1], index2);		
 
-		assert_eq!(arena.heap[99][TEST_ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(99*TEST_ARENA_CHUNK_SIZE+63, "All is fine")));
+		assert_eq!(arena[index2 - 1], Some(MyStruct::new(6398, "All is fine")));
 		assert_eq!(arena[index2], None);
+		assert_eq!(arena[index2 + 1], Some(MyStruct::new(6400, "All is fine")));
 
 		//alloc after free
 		let new_index1 = arena.alloc(MyStruct::new(777, "All is fine"));
 		assert_eq!(index2, new_index1);
-		assert_eq!(arena[index2], Some(MyStruct::new(777, "All is fine")));
+		assert_eq!(arena[index2], Some(MyStruct::new(777, "All is fine")));		
+		assert_ne!(arena[index2].as_ref().unwrap().x, 776);
+		assert_eq!(arena[index2].as_ref().unwrap().x, 777);
+		assert_ne!(arena[index2].as_ref().unwrap().x, 778);
+		assert_eq!(arena[index2].as_ref().unwrap().y, "All is fine");
 		assert_eq!(arena.freed.len(), 1);
 
 		let new_index2 = arena.alloc(MyStruct::new(888, "All is fine"));
 		assert_eq!(index1, new_index2);
-		assert_eq!(arena[index1], Some(MyStruct::new(888, "All is fine")));		
+		assert_eq!(arena[index1], Some(MyStruct::new(888, "All is fine")));
+		assert_ne!(arena[index2].as_ref().unwrap().x, 887);
+		assert_eq!(arena[index1].as_ref().unwrap().x, 888);
+		assert_ne!(arena[index2].as_ref().unwrap().x, 889);
+		assert_eq!(arena[index1].as_ref().unwrap().y, "All is fine");
 		assert_eq!(arena.freed.len(), 0);
 
 		//Check indexes
         let mut index = 0;
-        for i in 0..TEST_ARENA_CHUNK_SIZE+1
+        while index < TEST_ARENA_CHUNK_SIZE+1
         {
-        	assert_eq!(indexs[i], index);
+        	assert_eq!(indexs[index], index);
 
         	index += 1;
         }  		
